@@ -62,7 +62,7 @@ class Renju():
     for i in range(4):
       s = patterns[i]
       if (re.search(r'001110[^1]', s) or 
-        re.search(r'[^1]0011100', s) or
+        re.search(r'[^1]011100', s) or
         re.search(r'[^1]011010[^1]', s) or 
         re.search(r'[^1]010110[^1]', s)):
         cnt = cnt + 1
