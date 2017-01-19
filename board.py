@@ -13,13 +13,13 @@ class Stone(object):
 
 class Status(object):
   NONE = 0
-  FIVE = 1
-  FORBIDDEN = 2
-  STRAIGHT_FOUR = 3
+  THREE = 1
+  DOUBLE_THREE = 2
+  FOUR = 3
   DOUBLE_FOUR = 4
-  FOUR = 5
-  DOUBLE_THREE = 6
-  THREE = 7
+  STRAIGHT_FOUR = 5
+  FORBIDDEN = 6
+  FIVE = 7
   def __setattr__(self, *_):
     raise TypeError
 
@@ -38,7 +38,7 @@ class Board:
 
   def init(self, size=None, rule=None):
     self.size = size if size is not None else self.size
-    self.rule = rule if rule is not None else self.size
+    self.rule = rule if rule is not None else self.rule
     self.data = [
       [Stone.NONE for c in range(self.size)] 
       for r in range(self.size)
@@ -167,7 +167,6 @@ class Board:
         return Status.THREE    
 
     return Status.NONE
-
 
   
   def debugPrint(self):

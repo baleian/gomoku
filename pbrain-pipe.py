@@ -4,13 +4,24 @@ from rule import Renju
 from brain import Brain
 
 
+
+################################################################################
+# Global Values
+################################################################################
+mBoard = Board(size=15, rule=Renju())
+mBrain = Brain()
+myStone = Stone.NONE
+opStone = Stone.NONE
+################################################################################
+
+
 def start(cmd):
   boardSize = int(cmd[1])
   if boardSize is not 15:
     pipeWrite('ERROR Unsupport size of board, supported size is 15!')
     return
 
-  board.init(size=boardSize)
+  mBoard.init(size=boardSize)
 
   global myStone, opStone
   myStone = Stone.WHITE
@@ -23,8 +34,8 @@ def begin(cmd):
   myStone = Stone.BLACK
   opStone = Stone.WHITE
 
-  mid = board.size / 2
-  if board.putStone(mid, mid, myStone) is False:
+  mid = mBoard.size / 2
+  if mBoard.putStone(mid, mid, myStone) is False:
     pipeWrite('ERROR not valid begin position %d,%d' % (mid, mid))
     return
   pipeWrite("%d,%d" % (mid, mid))
@@ -32,46 +43,48 @@ def begin(cmd):
 
 def turn(cmd):
   r, c = cmd[1].split(',')
-  # r, c = brain.predict(board, opStone)
-  # r, c = raw_input().split(',')
-  # r, c = int(r), int (c)
-  if board.putStone(int(r), int(c), opStone) is False:
-    pipeWrite('ERROR not valid turn input %s,%s' % (int(r), int(c)))
+  r, c = int(r), int (c)
+  if mBoard.putStone(r, c, opStone) is False:
+    pipeWrite('ERROR not valid turn input %s,%s' % (r, c))
     return
-  # print 'after stone=', opStone, 'pos=', r, ',', c
-  # board.debugPrint()
-  # raw_input()
   
-  r, c = brain.predict(board, myStone)
-  # r, c = raw_input().split(',')
-  # r, c = int(r), int (c)
-  if board.putStone(r, c, myStone) is False:
+  r, c = mBrain.predict(mBoard, myStone)
+  if mBoard.putStone(r, c, myStone) is False:
     pipeWrite('ERROR not valid predict result %s,%s' % (r, c))
     return
-  # print 'after stone=', myStone, 'pos=', r, ',', c
-  # board.debugPrint()
-  # raw_input()
   pipeWrite("%d,%d" % (r, c))
   
 
-
 def board(cmd):
+  mBoard.init()
+  isFirst = True
+  whostone = {1: None, 2: None}
+
   while True:
     cmd = raw_input()
-    pipeWrite('MESSAGE board cmd: %s' % cmd)
-    if cmd is 'DONE': 
-      return
+    if cmd == 'DONE':
+      break    
     r, c, who = cmd.split(',')
-    if who is 1:
-      if board.putStone(r, c, myStone) is False:
-        break
-    elif who is 2:
-      if board.putStone(r, c, opStone) is False:
-        break
-    else:
-      break
+    r, c, who = int(r), int(c), int(who)
 
-  pipeWrite('ERROR Error while updating board!')
+    if isFirst:
+      isFirst = False
+      global myStone, opStone
+      if who is 1:
+        myStone, opStone = Stone.BLACK, Stone.WHITE
+      else:
+        myStone, opStone = Stone.WHITE, Stone.BLACK  
+      whostone[1], whostone[2] = myStone, opStone
+
+    if mBoard.putStone(r, c, whostone[who]) is False:
+      pipeWrite('ERROR not valid board input %s,%s,%s' % (r, c, who))
+      return
+
+  r, c = mBrain.predict(mBoard, myStone)
+  if mBoard.putStone(r, c, myStone) is False:
+    pipeWrite('ERROR not valid predict result %s,%s' % (r, c))
+    return
+  pipeWrite("%d,%d" % (r, c))
 
 
 def about(cmd):
@@ -90,7 +103,8 @@ def info(cmd):
     'RULE': info_rule,
     'GAME_TYPE': info_game_type,
     'TIME_LEFT': info_time_left,
-    'FOLDER': info_folder
+    'FOLDER': info_folder,
+    'EVALUATE': info_evaluate
   }
 
   cmdInfo.get(cmd[1], unknownCmd)(cmd[2])
@@ -118,7 +132,7 @@ def info_rule(type):
   if int(type) is not 4:
     pipeWrite('ERROR Unsupport rule, supported rule is renju & single game!')
     return
-  board.rule = Renju()
+  mBoard.rule = Renju()
 
 
 def info_game_type(tmp=None):
@@ -133,6 +147,10 @@ def info_folder(tmp=None):
   return
 
 
+def info_evaluate(tmp=None):
+  return
+
+
 def unknownCmd(tmp=None):
   pipeWrite('ERROR Unknown Command!')
 
@@ -143,17 +161,9 @@ def pipeWrite(str):
   sys.stdout.flush()
 
 
-
-
 ###############################################################################
 # Main
 ###############################################################################
-board = Board(size=15, rule=Renju())
-brain = Brain()
-myStone = Stone.NONE
-opStone = Stone.NONE
-
-
 if __name__ == "__main__":
   cmdMain = {
     'INFO': info,
@@ -167,7 +177,7 @@ if __name__ == "__main__":
 
   while True:
     cmd = raw_input().upper()
-    pipeWrite('MESSAGE input cmd: %s' % cmd)
+    # pipeWrite('MESSAGE input cmd: %s' % cmd)
     cmd = cmd.split()
     cmdMain.get(cmd[0], unknownCmd)(cmd)
 ###############################################################################
