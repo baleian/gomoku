@@ -2,137 +2,201 @@ from copy import copy, deepcopy
 from board import Stone, Status
 import random
 
+
+
 class Brain:
+  MAX_DEPTH = 2
+
   def __init__(self):
     pass
 
-
-  def minimax(self, board, stone, maxDepth, depth, isDebug=False):
-    if depth > maxDepth:
-      return (5, depth)
-
+  def predict(self, board, stone):
     opponent = Stone.WHITE if stone is Stone.BLACK else Stone.BLACK
-    size = board.size
-
-    dangers = []
+    
+    nears = []
     attacks = []
-    defends = []
-    possibles = []
-
-    # 바로 끝나는 경우
-    for r in range(size):
-      for c in range(size):
+    defenses = []
+    for r in range(board.size):
+      for c in range(board.size):
+        if board.status[opponent][r][c] >= Status.DOUBLE_THREE:
+          defenses.append((r, c, board.status[opponent][r][c]))
+        if board.status[stone][r][c] is Status.FORBIDDEN:
+          continue
         if board.status[stone][r][c] is Status.FIVE:
-          return (10, depth)
-
-        if board.status[opponent][r][c] is Status.FIVE:
-          dangers.append((r, c))
-
-        if (
-          board.status[stone][r][c] is Status.STRAIGHT_FOUR or
-          board.status[stone][r][c] is Status.DOUBLE_FOUR or
-          board.status[stone][r][c] is Status.FOUR or 
-          board.status[stone][r][c] is Status.DOUBLE_THREE or
-          board.status[stone][r][c] is Status.THREE
-        ):
+          return r, c
+        if board.status[stone][r][c] >= Status.THREE:
           attacks.append((r, c, board.status[stone][r][c]))
+        if board.status[stone][r][c] >= Status.NEAR:
+          nears.append((r, c))
+    
+    attacks.sort(key=lambda x: x[2], reverse=True)
+    defenses.sort(key=lambda x: x[2], reverse=True)
 
-        if (
-          board.status[opponent][r][c] is Status.STRAIGHT_FOUR or
-          board.status[opponent][r][c] is Status.DOUBLE_FOUR or
-          board.status[opponent][r][c] is Status.FOUR or 
-          board.status[stone][r][c] is Status.DOUBLE_THREE
-          # board.status[stone][r][c] is Status.DOUBLE_THREE
-        ):
-          defends.append((r, c, board.status[opponent][r][c]))
+    for r, c, stat in defenses:
+      if stat is Status.FIVE:
+        return r, c
 
-        if board.status[stone][r][c] is not Status.FORBIDDEN:
-          possibles.append((r, c))
-
-
-    # 이곳에 안 두면 지는 경우
-    # 어쩔 수 없이 두고 결과 리턴
-    for r, c in dangers:
-      st = deepcopy(board.status)
-      board.putStone(r, c, stone)
-      val, d = self.minimax(board, opponent, maxDepth, depth + 1)
-      board.data[r][c] = 0
-      board.status = st
-      return (10 - val, d)
-      
-
-    # 공격 루트가 있으면 우선 순위에 따라 공격해보고 이기는 곳이 있으면 리턴
-    attacks.sort(key=lambda x : x[2], reverse=True)
     for r, c, stat in attacks:
-      st = deepcopy(board.status)
-      board.putStone(r, c, stone)
-      val, d = self.minimax(board, opponent, maxDepth, depth + 1)
-      board.data[r][c] = 0
-      board.status = st
-      if val is 0:
-        return 10, d
+      if stat >= Status.DOUBLE_FOUR:
+        return r, c
+      elif stat is Status.DOUBLE_THREE:
+        if len(defenses) is 0 or defenses[0][2] < Status.FOUR:
+          return r, c
 
+    if len(attacks) > 0:
+      random.shuffle(attacks)
+      alpha, beta = 0, 10
+      for r, c, status in attacks:
+        st = deepcopy(board.status)
+        board.putStone(r, c, stone)
+        pipeWrite('MESSAGE attack suggest: %d,%d' % (r, c))
+        val = self.alphaBetaPruning(board, opponent, 0, alpha, beta, False)
+        board.data[r][c] = 0
+        board.status = st
+        pipeWrite('MESSAGE = %d' % val)
+        alpha = val if alpha < val else alpha
+        if val is 10:
+          return r, c
 
-    return (5, depth)
-    # TODO: 
-    # 상대방 공격 루트가 있으면 막을 수 있는지 체크
-    # depth를 넓히면 막다가도 역공해버릴 수도 있지만, 
-    # 일단 작은 뎁스로 막는지 성공하면 바로 return하여 성능 높이자
-    if len(defends) > 0:
+    if len(defenses) > 0:
+      matrix = [[0 for r in range(board.size)] for c in range(board.size)]
+      possibles = []
+      for r, c, status in defenses:
+        sr = r - 4 if r - 4 >= 0 else 0
+        sc = c - 4 if c - 4 >= 0 else 0
+        er = r + 4 if r + 4 < board.size else board.size - 1
+        ec = c + 4 if c + 4 < board.size else board.size - 1
+        for r2 in range(sr, er + 1):
+          for c2 in range(sc, ec + 1):
+            if board.status[stone][r2][c2] is not Status.FORBIDDEN:
+              matrix[r2][c2] = 1
+
+      for r in range(board.size):
+        for c in range(board.size):
+          if matrix[r][c] is 1:
+            possibles.append((r, c))
+
       random.shuffle(possibles)
-      minD = maxDepth
+      alpha, beta = 0, 5
       for r, c in possibles:
         st = deepcopy(board.status)
         board.putStone(r, c, stone)
-        val, d = self.minimax(board, opponent, maxDepth, depth + 1)
+        pipeWrite('MESSAGE defense suggest: %d,%d' % (r, c))
+        val = self.alphaBetaPruning(board, opponent, 0, alpha, beta, False)
         board.data[r][c] = 0
         board.status = st
-        if val < 10:  # 내가 이기거나 비기면 바로 리턴. depth를 늘리면 내가 이기는 경우가 있을때 리턴 가능
-          return 10 - val, d
-        else: # 내가 지는 경우 최소 몇전째 depth에서 지는지 기록
-          if minD > d:
-            minD = d
+        pipeWrite('MESSAGE = %d' % val)
+        alpha = val if alpha < val else alpha
+        if val >= 5:
+          return r, c
 
-      # 최소 비기는 경우가 없을 때 지는 것이므로 지는 경우로 리턴
-      return 0, minD
-    
-    # 그 외 판단이 어려운 경우 비긴다고 가정
-    return (5, depth)
- 
+      #pipeWrite('MESSAGE defense possibles: %s' % str(possibles))
+      #return random.choice(possibles)
 
-  def predict(self, board, stone):
-    # 앞으로 N수 앞까지 봐서 점수가 가장 높은 곳 중에 predict 시키자
+    return random.choice(nears)
+
+
+  def alphaBetaPruning(self, board, stone, depth=0, alpha=0, beta=10, maxPlayer=True):
+    #raw_input()
+    #board.debugPrint()
+    #pipeWrite('MESSAGE depth=%d' % depth)
+    if depth > self.MAX_DEPTH:
+      return 5
+
     opponent = Stone.WHITE if stone is Stone.BLACK else Stone.BLACK
-    score = [[(0, 0) for r in range(board.size)] for c in range(board.size)]
-
+    
+    attacks = []
+    defenses = []
     for r in range(board.size):
       for c in range(board.size):
+        if board.status[opponent][r][c] >= Status.DOUBLE_THREE:
+          defenses.append((r, c, board.status[opponent][r][c]))
         if board.status[stone][r][c] is Status.FORBIDDEN:
           continue
-
         if board.status[stone][r][c] is Status.FIVE:
-          score[r][c] = (10, 0)
-          continue
+          return 10 if maxPlayer else 0
+        if board.status[stone][r][c] >= Status.THREE:
+          attacks.append((r, c, board.status[stone][r][c]))
+    
+    attacks.sort(key=lambda x: x[2], reverse=True)
+    defenses.sort(key=lambda x: x[2], reverse=True)
 
-        # 상대방이 5를 만들 수 있는 경우를 고려 안해도 되는 이유가
-        # 어차피 그 곳을 안막는 모든 다른 수는 0점이 될 것이고 그 곳만 5점 또는 10점이 될 것이므로
-        # 내 입장만 고려하면 된다!
+    if len(defenses) >= 2 and defenses[1][2] is Status.FIVE:
+      return 0 if maxPlayer else 10
 
-        # 여기 둔 경우 상대방이 뭘 두더라도 내가 최대로 뽑을 수 있는 점수를 기록한다
+    if len(defenses) >= 1 and defenses[0][2] is Status.FIVE:
+      r, c = defenses[0][0], defenses[0][1]
+      st = deepcopy(board.status)
+      board.putStone(r, c, stone)
+      val = self.alphaBetaPruning(board, opponent, depth, alpha, beta, not maxPlayer)
+      board.data[r][c] = 0
+      board.status = st
+      return val
+
+    for r, c, stat in attacks:
+      if stat >= Status.DOUBLE_FOUR:
+        return 10 if maxPlayer else 0
+      elif stat is Status.DOUBLE_THREE:
+        if len(defenses) is 0 or defenses[0][2] < Status.FOUR:
+          return 10 if maxPlayer else 0
+
+    if len(attacks) > 0:
+      random.shuffle(attacks)
+      alpha, beta = 0, 10
+      for r, c, status in attacks:
         st = deepcopy(board.status)
         board.putStone(r, c, stone)
-        val, d = self.minimax(board, opponent, 4, 1, r is 7 and c is 4) # 앞으로 5수를 더 두어본다
-        score[r][c] = (10 - val, d)
+        if status < Status.FOUR:
+          val = self.alphaBetaPruning(board, opponent, depth + 1, alpha, beta, not maxPlayer)
+        else:
+          val = self.alphaBetaPruning(board, opponent, depth, alpha, beta, not maxPlayer)
         board.data[r][c] = 0
         board.status = st
+        if maxPlayer:
+          alpha = val if alpha < val else alpha
+        else:
+          beta = val if beta > val else beta
+        if alpha >= beta:
+          return alpha if maxPlayer else beta
 
-    for c in range(board.size):
-      str1 = ''
+    if len(defenses) > 0:
+      matrix = [[0 for r in range(board.size)] for c in range(board.size)]
+      possibles = []
+      for r, c, status in defenses:
+        sr = r - 4 if r - 4 >= 0 else 0
+        sc = c - 4 if c - 4 >= 0 else 0
+        er = r + 4 if r + 4 < board.size else board.size - 1
+        ec = c + 4 if c + 4 < board.size else board.size - 1
+        for r2 in range(sr, er + 1):
+          for c2 in range(sc, ec + 1):
+            if board.status[stone][r2][c2] is not Status.FORBIDDEN:
+              matrix[r2][c2] = 1
+              
       for r in range(board.size):
-        str1 = str1 + ('(%2d,%2d)' % score[r][c])
-      pipeWrite('MESSAGE %s' % str1)
+        for c in range(board.size):
+          if matrix[r][c] is 1:
+            possibles.append((r, c))
 
-    return 0, 0
+      random.shuffle(possibles)
+      alpha, beta = 0, 5
+      for r, c in possibles:
+        st = deepcopy(board.status)
+        board.putStone(r, c, stone)
+        val = self.alphaBetaPruning(board, opponent, depth + 1, alpha, beta, not maxPlayer)
+        board.data[r][c] = 0
+        board.status = st
+        alpha = val if alpha < val else alpha
+        if maxPlayer:
+          alpha = val if alpha < val else alpha
+        else:
+          beta = val if beta > val else beta
+        if alpha >= beta:
+          return alpha if maxPlayer else beta
+
+      #pipeWrite('MESSAGE defense possibles: %s' % str(possibles))
+      #return random.choice(possibles)
+
+    return 5
 
 
 
