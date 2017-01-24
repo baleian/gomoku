@@ -48,15 +48,15 @@ def turn(cmd):
     pipeWrite('ERROR not valid turn input %s,%s' % (r, c))
     return
   
-  mBoard.debugPrint()
-  r, c = raw_input().split(',')
-  r, c = int(r), int (c)
-  #r, c = mBrain.predict(mBoard, myStone)
+  # mBoard.debugPrint()
+  # r, c = raw_input().split(',')
+  # r, c = int(r), int (c)
+  r, c = mBrain.predict(mBoard, myStone)
   if mBoard.putStone(r, c, myStone) is False:
     pipeWrite('ERROR not valid predict result %s,%s' % (r, c))
     return
   pipeWrite("%d,%d" % (r, c))
-  mBoard.debugPrint()
+  # mBoard.debugPrint()
   
 
 def board(cmd):
@@ -147,8 +147,8 @@ def info_time_left(tmp=None):
   return
 
 
-def info_folder(tmp=None):
-  return
+def info_folder(path):
+  mBrain.xl_path = path
 
 
 def info_evaluate(tmp=None):

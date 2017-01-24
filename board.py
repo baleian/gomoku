@@ -1,6 +1,6 @@
 #-*- coding: utf-8 -*-
 
-import copy
+from copy import copy, deepcopy
 
 
 class Stone(object):
@@ -15,13 +15,13 @@ class Status(object):
   FORBIDDEN = -1
   NONE = 0
   NEAR = 1
-  TWO = 2
-  THREE = 3
-  DOUBLE_THREE = 4
-  FOUR = 5
-  DOUBLE_FOUR = 6
-  STRAIGHT_FOUR = 7
-  FIVE = 8
+  TWO = 4
+  THREE = 5
+  DOUBLE_THREE = 6
+  FOUR = 7
+  DOUBLE_FOUR = 8
+  STRAIGHT_FOUR = 9
+  FIVE = 10
   def __setattr__(self, *_):
     raise TypeError
 
@@ -35,6 +35,7 @@ class Board:
       Stone.BLACK: None,
       Stone.WHITE: None
     }
+    self.stack = None
     self.init(size, rule)
 
 
@@ -45,16 +46,15 @@ class Board:
       [Stone.NONE for c in range(self.size)] 
       for r in range(self.size)
     ]
-    
     self.status[Stone.BLACK] = [
       [Status.NONE for c in range(self.size)]
       for r in range(self.size)
     ]
-
     self.status[Stone.WHITE] = [
       [Status.NONE for c in range(self.size)]
       for r in range(self.size)
     ]
+    self.stack = []
 
 
   def putStone(self, r, c, stone):
@@ -68,11 +68,17 @@ class Board:
       return False
 
     self.data[r][c] = stone
+    self.stack.append((r, c, stone, deepcopy(self.status)))
     opponent = Stone.WHITE if stone is Stone.BLACK else Stone.BLACK
     self.updateStatusNearBy(r, c, stone)
     self.updateStatusNearBy(r, c, opponent)
-
     return True
+
+
+  def traceBack(self):
+    r, c, stone, status = self.stack.pop()
+    self.data[r][c] = 0
+    self.status = status
 
 
   def isRange(self, r, c):

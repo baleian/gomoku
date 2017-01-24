@@ -144,7 +144,7 @@ class Renju(BasicRule):
         re.search(r'[^1]000110[^1]', row) or
         re.search(r'[^1]001010[^1]', row) or
         re.search(r'[^1]001100[^1]', row) or
-        re.search(r'[^1]010010[^1]', row) or
+        # re.search(r'[^1]010010[^1]', row) or
         re.search(r'[^1]010100[^1]', row) or
         re.search(r'[^1]001010[^1]', row) or
         re.search(r'[^1]011000[^1]', row)
@@ -154,7 +154,7 @@ class Renju(BasicRule):
         re.search(r'000220', row) or
         re.search(r'002020', row) or
         re.search(r'002200', row) or
-        re.search(r'020020', row) or
+        # re.search(r'020020', row) or
         re.search(r'020200', row) or
         re.search(r'002020', row) or
         re.search(r'022000', row)
